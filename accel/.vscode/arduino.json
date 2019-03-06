@@ -1,0 +1,6 @@
+{
+    "port": "COM20",
+    "board": "arduino:avr:uno",
+    "programmer": "AVRISP mkII",
+    "sketch": "accel.ino"
+}
