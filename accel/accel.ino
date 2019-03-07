@@ -16,7 +16,7 @@ float travel; // distance covered in dicrete time
 MPU6050 mpu; // mpu object
 void setup() {
   // put your setup code here, to run once:
-Serial.begin(38400); 
+Serial.begin(9600); 
 mpu.initialize(); Serial.print("initializing MPU...");
 
 if (mpu.testConnection() == true) {
@@ -49,7 +49,14 @@ void loop() {
 	accFilter(); //filter accelerometers
 	//float a = dist(1,20); // get x acc at 20 milliseconds interval
 	//Serial.print(real_gyroX); Serial.print("  "); Serial.print(real_gyroY); Serial.print(" "); Serial.println(real_gyroZ);
-  Serial.print(real_acx); Serial.print("  "); Serial.print(real_acy); Serial.print(" "); Serial.println(real_acz);
+//Serial.print(real_acx); Serial.print("  "); Serial.print(real_acy); Serial.print(" "); Serial.println(real_acz);
+	/*/
+	double a = getOrien(real_acx); 
+	double b = getOrien(real_acy);
+	double c = getOrien(real_acz);
+	Serial.print(a); Serial.print("  "); Serial.print(b); Serial.print(" "); Serial.println(c);*/
+	float a = linear_acc(real_acx);
+	Serial.println(a);
 }
 
 float acc_process(float acc) {
@@ -124,11 +131,11 @@ void callibrate_acc(int spd){
     noise_Acz[i] = acc_process(mpu.getAccelerationZ());
 
   
-    delay(100);// callibration speed
+    delay(spd);// callibration speed
 
 
     if (i == dataSize - 1) {
-		Serial.println("############## ACCELEROMETERS CALIBRATION SUCCESSFUL ##############");
+		Serial.println("ACCELEROMETERS CALIBRATION SUCCESSFUL");
       continue;
     }
     else if (i < dataSize) {
@@ -203,11 +210,11 @@ void callibrate_gyro(int spd){
     noise_Gyy[i] = acc_process(mpu.getRotationY());
     noise_Gyz[i] = acc_process(mpu.getRotationZ());
 
-    delay(100);// callibration speed
+    delay(spd);// callibration speed
 
 
     if (i == dataSize - 1) {
-		Serial.println("################# GYRO CALIBRATION SUCCESSFUL ###########");
+		Serial.println("  GYRO CALIBRATION SUCCESSFUL ");
       continue;
     }
     else if (i < dataSize) {
@@ -315,10 +322,23 @@ void accFilter() { // filters mpu data by prcessing net values
 
 
 
-void distint_lin_acc() {
-	//distintly separates rotational acceleration from linear acceleration
+float linear_acc(float acc){
+//distintly separates rotational acceleration from linear acceleration
+	float g = 9.81;
+	float a_mpu = acc;
+	float a_tilt, a_lin;
+	double theta = getOrien(acc);
+	a_tilt = g * sin(theta);
+	a_lin = a_mpu - a_tilt;
+	return a_lin;
 
-	
+}
 
+float getOrien(double acc){
+	// get orientation in degrees 
+	double g = 9.81; //m/s^2
+	double theta = asin(acc / g);
+ theta = (theta/PI)*180;
+	return theta;
 
 }
