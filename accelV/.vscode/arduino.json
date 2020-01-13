@@ -2,5 +2,6 @@
     "port": "COM6",
     "board": "arduino:avr:nano",
     "configuration": "cpu=atmega328old",
-    "programmer": "AVRISP mkII"
+    "programmer": "AVRISP mkII",
+    "sketch": "accelV.ino"
 }

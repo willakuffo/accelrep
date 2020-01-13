@@ -8,10 +8,10 @@ float ax_p, ay_p, az_p;
 float real_acx, real_acy, real_acz;//stationary noise.offsets filtered with bandpass
 float real_gx, real_gy, real_gz;
 # define gravity 9.81
-int accelX_buff[100], accelY_buff[100], accelZ_buff[100];
 int meanX, meanY, meanZ;
-int accelmin[3], accelmax[3], gyromin[3], gyromax[3];;
+float accelmin[3], accelmax[3], gyromin[3], gyromax[3];;
 float angle_x, angle_y, angle_z;
+float pitch_acc,roll_acc,yaw_acc,pitch_gyro,roll_gyro,yaw_gyro;
 
 MPU6050 mpu;
 
@@ -21,6 +21,8 @@ void setup() {
   Serial.begin(38400);
   mpu.initialize();
   mpu.setSleepEnabled(false);
+  //mpu.setFullScaleAccelRange(0); // 0=> +-250deg/s ; 1=> +-500deg/s ; 2=> +-1000deg/s ; 3=> 2000deg/s
+  //mpu.setFullScaleGyroRange(3);  // 0=> +-2g ; 1=> +-4g ; 2=> +-8g ; 3=> +-16g
   callibrate_noise(50,20); //required for autoFilter of acc
 
 }
@@ -30,28 +32,41 @@ void loop() {
   // mpu.setDLPFMode(6);//set lowpass filter
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
   acc_process(6); //process acc values into ms/^2
-  accFilter_auto(20);//for auto bandpass filter...requires callibration_noise to run first in setup to acquire thresholds automatically
-  gyroFilter_auto(20);//
+ //=======================AUTO CONFIG================================= 
+ //accel filter 
+  float a[3] = {accelmin[0],accelmin[1], accelmin[2]}; //min  values for bandpass
+  float b[3] = {accelmax[0],accelmax[1],accelmax[2]}; //max amplitudes for bandmass
+  //gyro filter
+  float c[3] = {gyromin[0],gyromin[1], gyromin[2]}; //min  values for bandpass
+  float d[3] = {gyromax[0],gyromax[1],gyromax[2]}; //max amplitudes for bandmass
+  //======================MANUAL CONFIG===========================
   //float a[3] = { -1, -1, 9.79}; //min  values for bandpass
   //float b[3] = {1, 1, 9.81}; //max amplitudes for bandmass
-  //accFilter_man(a, b, 20); //manual bandpass filter
+  accFilter(a, b, 20); //manual bandpass filter
   //float c[3] = { -160, -90, 140}; //min  values for bandpass
   //float d[3] = { -150, -80, 150}; //max amplitudes for bandmass
-  //gyroFilter_man(c, d, 20);
+  gyroFilter(c, d, 20);
+ // ================================================================
+
+ //gyro
+ //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  Serial.print(real_acx); Serial.print("  ");
+  Serial.print(real_acy); Serial.print("  ");
+  Serial.print(real_acz);Serial.print(" ");
+  //accel
+  //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   Serial.print(real_gx); Serial.print("  ");
-  Serial.print(real_gy); Serial.print("  ");
-  Serial.println(real_gz);
-  /* Serial.print(real_acx); Serial.print("  ");
-     Serial.print(real_acy); Serial.print("  ");
-     Serial.println(real_acz);*/
-  //orientation();
-  //delay(200);
+     Serial.print(real_gy); Serial.print("  ");
+     Serial.println(real_gz);
+  //gyro_orientation(20);
+
 }
 
 void acc_process(int filter_mode) {
   //process and convert to ms/^2
-  mpu.setDLPFMode(filter_mode);//low pass filter mode 0
+  mpu.setDLPFMode(filter_mode);//low pass filter mode
   // map and process raw values to gravity
+  //normalization values are affected by fullscale reading
   ax_p = ax / 1573.90;
   ay_p = ay / 1662.18;
   az_p = -(az / 2052.11); // reason for -ve is that my mpu is upside down
@@ -62,7 +77,6 @@ void callibrate_noise(int dataSize ,int spd) {
   float noise_Acx[dataSize];
   float noise_Acy[dataSize];
   float noise_Acz[dataSize];
-
   float noise_Gx[dataSize];
   float noise_Gy[dataSize];
   float noise_Gz[dataSize];
@@ -94,39 +108,33 @@ void callibrate_noise(int dataSize ,int spd) {
     }
     // for finding minimum values --algorithm: - if im greater than you, make me you else make me me (dont change me)
     //'' '''''''''maximum'''''''''''''''''' -      if im less '''''''''''''''''''''''''''''''''''''''''''''''''''''''
-
     // itereation to find accelerometer max noise values
     /*if (acxmax < noise_Acx[i]) {
       acxmax = noise_Acx[i];
       } else {
       acxmax = acxmax;
       }
-
       if (acymax < noise_Acy[i]) {
       acymax = noise_Acy[i];
       } else {
       acymax = acymax;
       }
-
       if (aczmax < noise_Acz[i]) {
       aczmax = noise_Acz[i];
       } else {
       aczmax = aczmax;
       }
-
       // min noise values for accelerometer
       if (acxmin > noise_Acx[i]) {
       acxmin = noise_Acx[i];
       } else {
       acxmin = acxmin;
       }
-
       if (acymin > noise_Acy[i]) {
       acymin = noise_Acy[i];
       } else {
       acymin = acymin;
       }
-
       if (aczmin < noise_Acz[i]) {
       aczmin = noise_Acz[i];
       } else {
@@ -139,32 +147,27 @@ void callibrate_noise(int dataSize ,int spd) {
       } else {
       gxmax = gxmax;
       }
-
       if (gymax < noise_Gy[i]) {
       gymax = noise_Gy[i];
       } else {
       gymax = gymax;
       }
-
       if (gzmax < noise_Gz[i]) {
       gzmax = noise_Gz[i];
       } else {
       gzmax = gzmax;
       }
-
       // min noise values for gyro
       if (gxmin > noise_Gx[i]) {
       gxmin = noise_Gx[i];
       } else {
       gxmin = gxmin;
       }
-
       if (gymin > noise_Gy[i]) {
       gymin = noise_Gy[i];
       } else {
       gymin = gymin;
       }
-
       if (gzmin < noise_Gz[i]) {
       gzmin = noise_Gz[i];
       } else {
@@ -201,37 +204,15 @@ void callibrate_noise(int dataSize ,int spd) {
   Serial.print(gxmin); Serial.print("  ");
   Serial.print(gymin); Serial.print("  ");
   Serial.println(gzmin);
-  delay(30000); //debugging delay
+  delay(5000); //debugging delay
 }
 
-void accFilter_auto(int spd) {
-  //filters stationary noise acts as a bandpass filter
 
-  if (ax_p >= accelmin[0] && ax_p <= accelmax[0]) { // if x  axis accel is within noise range
-    real_acx = 0;
-  } else {
-    real_acx = ax_p;
-  }
 
-  if (ay_p <= accelmax[1] && ay_p >= accelmin[1]) { // if axis accel is within noise range
-    real_acy = 0;
-  } else {
-    real_acy = ay_p;
-  }
-
-  if (az_p <= accelmax[2] && az_p >= accelmin[2]) { // if z axis accel is within noise range
-    real_acz = 9.81;
-  }
-  else {
-    real_acz = abs(az_p);  // particularly for z to account for gravity
-  }
-  delay(spd); //return rate
-}
-void accFilter_man(float accel_min[3], float accel_max[3], int spd) {
+void accFilter(float accel_min[3], float accel_max[3], int spd) {
   //manual mode of accFilter_auto, rather specify your own min and maximum noise bands
   //filters stationary noise acts as a bandpass filter
   //no need to call callibrate_noise function for auto callibration. That is for auto acc
-
   if (ax_p >= accel_min[0] && ax_p <= accel_max[0]) { // if x  axis accel is within noise range
     real_acx = 0;
   } else {
@@ -252,34 +233,13 @@ void accFilter_man(float accel_min[3], float accel_max[3], int spd) {
   }
   delay(spd); //return rate
 }
-void gyroFilter_auto(int spd) {
-  //filters stationary noise acts as a bandpass filter
 
-  if (gx >= gyromin[0] && gx <= gyromax[0]) { // if x  axis accel is within noise range
-    real_gx = 0;
-  } else {
-    real_gx = gx;
-  }
 
-  if (gy <= gyromax[1] && gy >= gyromin[1]) { // if axis accel is within noise range
-    real_gy = 0;
-  } else {
-    real_gy = gy;
-  }
 
-  if (az_p <= gyromax[2] && az_p >= gyromin[2]) { // if z axis accel is within noise range
-    real_acz = 0;
-  }
-  else {
-    real_gz = gz;  // particularly for z to account for gravity
-  }
-  delay(spd); //return rate
-}
-void gyroFilter_man(float gyro_min[3], float gyro_max[3], int spd) {
+void gyroFilter(float gyro_min[3], float gyro_max[3], int spd) {
   //manual mode of gyroFilter_auto, rather specify your own min and maximum noise bands
   //filters stationary noise acts as a bandpass filter
   //no need to call callibrate_noise function for auto callibration. That is for auto acc
-
   if (gx >= gyro_min[0] && gx <= gyro_max[0]) { // if x  axis accel is within noise range
     real_gx = 0;
   } else {
@@ -301,15 +261,17 @@ void gyroFilter_man(float gyro_min[3], float gyro_max[3], int spd) {
   delay(spd); //return rate
 }
 
-void orientation(int Ts) {
-  float angle_x, angle_y, angle_z;
-  angle_x = angle_x + gx * Ts;
-  angle_y = angle_y + gy * Ts;
-  angle_z = angle_z + gz * Ts;
-  Serial.print(gx); Serial.print("  ");
-  Serial.print(gy); Serial.print("  ");
-  Serial.println(gz);
-
-  //delay(Ts);//sampling rate
-
+void acc_orientation() {
+pitch_acc = asin(ax_p/9.81)*RAD_TO_DEG; roll_acc = asin(ay_p/9.81)*RAD_TO_DEG; yaw_acc = asin(az_p/9.81)*RAD_TO_DEG;
+Serial.print(pitch_acc);Serial.print(" ");Serial.print(roll_acc);Serial.print(" ");
+Serial.println(yaw_acc);
+}
+void gyro_orientation(int sample_rate) {
+pitch_gyro = pitch_gyro+(gx*sample_rate);
+roll_gyro = roll_gyro+(gx*sample_rate);
+yaw_gyro = yaw_gyro+(gx*sample_rate);
+Serial.print("                           ");
+Serial.print(pitch_gyro);Serial.print(" ");Serial.print(roll_gyro);Serial.print(" ");
+Serial.println(yaw_gyro);
+delay(sample_rate);
 }
