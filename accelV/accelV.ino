@@ -8,10 +8,11 @@ float ax_p, ay_p, az_p, gx_p, gy_p, gz_p;
 float real_acx, real_acy, real_acz;//stationary noise.offsets filtered with bandpass
 float real_gx, real_gy, real_gz;
 # define gravity 9.81
-float a[3], b[3], c[3], d[3];
+float a[3], b[3], c[3], d[3]; //thresholds
 float accelmin[3], accelmax[3], gyromin[3], gyromax[3];;
 float angle_x, angle_y, angle_z;
 float pitch_acc, roll_acc, yaw_acc, pitch_gyro, roll_gyro, yaw_gyro;
+float F_pitch,F_roll;//complimetary filter angles
 float acxmax, acymax, aczmax, acxmin , acymin , aczmin;
 float gxmax , gymax , gzmax, gxmin, gymin , gzmin ;
 
@@ -28,7 +29,7 @@ void setup() {
   mpu.setFullScaleAccelRange(0); // 0=> +-250deg/s ; 1=> +-500deg/s ; 2=> +-1000deg/s ; 3=> 2000deg/s
   mpu.setFullScaleGyroRange(0);  // 0=> +-2g ; 1=> +-4g ; 2=> +-8g ; 3=> +-16g
   if (CALLIBRATION_MODE_AUTO) {
-    callibrate_noise(50, 100); //required for autoFilter of acc
+    callibrate_noise(50, 100); //required for autoFilter of acc.Callibrate for (n_samples,sample_period)
     //=======================AUTO CONFIG=================================
     //accel filter
     a[0] = acxmin; a[1] = acymin; a[2] = aczmin; //min  values for bandpass
@@ -63,16 +64,17 @@ void loop() {
 
   //gyro
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  /*Serial.print(ax_p); Serial.print("  ");
+ /* Serial.print(ax_p); Serial.print("  ");
     Serial.print(ay_p); Serial.print("  ");
     Serial.print(az_p); Serial.println(" ");*/
   //accel
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  Serial.print(real_gx); Serial.print("  ");
-    Serial.print(real_gy); Serial.print("  ");
-    Serial.println(real_gz);
- // gyro_orientation(0.0196);
-  //acc_orientation();
+//  Serial.print(real_gx+1); Serial.print("  ");
+//    Serial.print(real_gy+1.5); Serial.print("  ");
+//   Serial.println(real_gz);
+  gyro_orientation(0.0196);
+  acc_orientation();
+  CFilter(0.94,0.06);
 }
 
 void acc_process(float sensitivity) {
@@ -80,9 +82,9 @@ void acc_process(float sensitivity) {
 
   // map and process raw values to gravity
   //normalization values are affected by fullscale reading
-  ax_p = ax / sensitivity;
-  ay_p = ay / sensitivity;
-  az_p = -(az / sensitivity);
+  ax_p = ax / sensitivity*9.81;
+  ay_p = ay / sensitivity*9.81;
+  az_p = -(az / sensitivity)*9.81;
   //currently returns G-forces
   /*ax_p = ax / 1573.90;
     ay_p = ay / 1662.18;
@@ -217,21 +219,32 @@ void gyroFilter(float gyro_min[3], float gyro_max[3], int spd) {
 }
 
 void acc_orientation() {
-  pitch_acc = asin(ax_p / 9.81) * RAD_TO_DEG; roll_acc = asin(ay_p / 9.81) * RAD_TO_DEG; yaw_acc = asin(az_p / 9.81) * RAD_TO_DEG;
-  Serial.print(pitch_acc); Serial.print(" "); Serial.print(roll_acc); Serial.print(" ");
-  Serial.println(yaw_acc);
+  pitch_acc = atan2(ay_p, sqrt(pow(ax_p,2)+pow(az_p,2))) * RAD_TO_DEG; roll_acc = atan2(ax_p, sqrt(pow(ay_p,2)+pow(az_p,2)))* RAD_TO_DEG; yaw_acc = asin(az_p / 9.81) * RAD_TO_DEG;
+  if (isnan(yaw_acc)){
+    yaw_acc = 90;
+    }
+  /*Serial.print(pitch_acc); Serial.print(" "); Serial.print(roll_acc); Serial.print(" ");
+  Serial.println(yaw_acc);*/
 }
 
-void gyro_orientation(int sample_rate) {
-  pitch_gyro = pitch_gyro + (real_gx * sample_rate);
-  roll_gyro = roll_gyro + (real_gy * sample_rate);
+void gyro_orientation(double sample_rate) {
+  int gyro_offset_x = -1; // x offset
+  int gyro_offset_y = 0;//y
+  pitch_gyro = pitch_gyro + ((real_gx-gyro_offset_x) * sample_rate);
+  roll_gyro = roll_gyro + ((real_gy-gyro_offset_y) * sample_rate);
   yaw_gyro = yaw_gyro + (real_gz * sample_rate);
   // Serial.print("                           ");
-  Serial.print(-90000);  // To freeze the lower limit
+  /*Serial.print(-900);  // To freeze the lower limit
   Serial.print(" ");
-  Serial.print(90000);  // To freeze the upper limit
+  Serial.print(900);  // To freeze the upper limit
   Serial.print(" ");
   Serial.print(pitch_gyro); Serial.print(" "); Serial.print(roll_gyro); Serial.print(" ");
-  Serial.println(yaw_gyro);
+  Serial.println(yaw_gyro);*/
 
 }
+
+void CFilter(float gyro_coeff,float accel_coeff){
+  F_pitch = gyro_coeff*pitch_gyro+accel_coeff*pitch_acc;
+  F_roll = gyro_coeff*roll_gyro+accel_coeff*roll_acc;
+  Serial.print(F_pitch);Serial.print(" ");Serial.println(F_roll);
+  }
