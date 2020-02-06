@@ -18,7 +18,7 @@ def server():
     server_sock.close()
 
 def client():
-    bd_addr = 'B8:27:EB:DC:71:DA' #pis address
+    bd_addr = '98:D3:41:FD:6D:F9' #HC-06 address
 
     port = 4
 

@@ -12,6 +12,8 @@ float a[3], b[3], c[3], d[3]; //thresholds
 float accelmin[3], accelmax[3], gyromin[3], gyromax[3];;
 float angle_x, angle_y, angle_z;
 float pitch_acc, roll_acc, yaw_acc, pitch_gyro, roll_gyro, yaw_gyro;
+float axis_angle,axis1_angle,axis2_angle,axis_acc;
+int rotor[2];
 float F_pitch,F_roll;//complimetary filter angles
 float acxmax, acymax, aczmax, acxmin , acymin , aczmin;
 float gxmax , gymax , gzmax, gxmin, gymin , gzmin ;
@@ -74,7 +76,7 @@ void loop() {
 //   Serial.println(real_gz);
   gyro_orientation(0.0196);
   acc_orientation();
-  CFilter(0.94,0.06);
+  //CFilter(0.94,0.06);
 }
 
 void acc_process(float sensitivity) {
@@ -218,13 +220,16 @@ void gyroFilter(float gyro_min[3], float gyro_max[3], int spd) {
   delay(spd); //return rate
 }
 
+
 void acc_orientation() {
+
   pitch_acc = atan2(ay_p, sqrt(pow(ax_p,2)+pow(az_p,2))) * RAD_TO_DEG; roll_acc = atan2(ax_p, sqrt(pow(ay_p,2)+pow(az_p,2)))* RAD_TO_DEG; yaw_acc = asin(az_p / 9.81) * RAD_TO_DEG;
   if (isnan(yaw_acc)){
     yaw_acc = 90;
-    }
+    
   /*Serial.print(pitch_acc); Serial.print(" "); Serial.print(roll_acc); Serial.print(" ");
   Serial.println(yaw_acc);*/
+}
 }
 
 void gyro_orientation(double sample_rate) {
@@ -240,7 +245,6 @@ void gyro_orientation(double sample_rate) {
   Serial.print(" ");
   Serial.print(pitch_gyro); Serial.print(" "); Serial.print(roll_gyro); Serial.print(" ");
   Serial.println(yaw_gyro);*/
-
 }
 
 void CFilter(float gyro_coeff,float accel_coeff){
