@@ -41,7 +41,7 @@ while True:
         if pwm>max_pwm:pwm = max_pwm
         if pwm<min_pwm:pwm = min_pwm
         sock.send(bytes(throttle,'utf-8'))
-    time.sleep(delay_time)
+    time.sleep(delay_time)# this delay is essential to ensure that there is no lag and instability of the drone while responding to ground control
     print('Data:',throttle,' Throttle Quantity:',pwm,' throttle mode:',throttle_mode,' Buffering:',Buffering)
 
 
