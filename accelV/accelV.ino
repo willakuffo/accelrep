@@ -12,11 +12,10 @@ float a[3], b[3], c[3], d[3]; //thresholds
 float accelmin[3], accelmax[3], gyromin[3], gyromax[3];;
 float angle_x, angle_y, angle_z;
 float pitch_acc, roll_acc, yaw_acc, pitch_gyro, roll_gyro, yaw_gyro;
-float axis_angle,axis1_angle,axis2_angle,axis_acc;
-int rotor[2];
-float F_pitch,F_roll;//complimetary filter angles
+float F_pitch, F_roll; //complimetary filter angles
 float acxmax, acymax, aczmax, acxmin , acymin , aczmin;
 float gxmax , gymax , gzmax, gxmin, gymin , gzmin ;
+float gyro_offsets[3];
 
 boolean CALLIBRATION_MODE_AUTO = false;//callibration mode
 
@@ -24,6 +23,7 @@ MPU6050 mpu;
 
 void setup() {
   // put your setup code here, to run once:
+
   Wire.begin();
   Serial.begin(38400);
   mpu.initialize();
@@ -44,8 +44,8 @@ void setup() {
   else {
     Serial.println("   //======================MANUAL CONFIG===========================\n!!! Callibration mode is set to Manual!!!\n PLEASE ensure that the vaules for the filter array is provided");
     //gyro
-    c[0] = 0; c[1] = 0; c[2] = -1; //min  values for bandpass
-    d[0] = 0; d[1] = 0; d[2] = 1; //max amplitudes for bandmass
+    c[0] = 0; c[1] = 0; c[2] = 0; //min  values for bandpass
+    d[0] = 0; d[1] = 0; d[2] = 0; //max amplitudes for bandmass
     //accel
     a[0] = 0.4; a[1] = -0.13; a[2] = 9.70; //min  values for bandpass
     b[0] = 0.5; b[1] = -0.09; b[2] = 9.81; //max amplitudes for bandmass
@@ -55,28 +55,29 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  // mpu.setDLPFMode(6);//set lowpass filter
+  
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  mpu.setDLPFMode(6);//low pass filter mode
+  mpu.setDLPFMode(6);//low pass filter mode. at this setting, sample time is 19.6ms
   acc_process(16384.0); //process acc values into ms/^2
   gyro_process(131);
-  //accFilter(a, b, 0); //manual bandpass filter
+  accFilter(a, b, 0); //manual bandpass filter
   gyroFilter(c, d, 0);
   // ================================================================
 
   //gyro
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- /* Serial.print(ax_p); Serial.print("  ");
-    Serial.print(ay_p); Serial.print("  ");
-    Serial.print(az_p); Serial.println(" ");*/
+  /* Serial.print(ax_p); Serial.print("  ");
+     Serial.print(ay_p); Serial.print("  ");
+     Serial.print(az_p); Serial.println(" ");*/
   //accel
   //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-//  Serial.print(real_gx+1); Serial.print("  ");
-//    Serial.print(real_gy+1.5); Serial.print("  ");
-//   Serial.println(real_gz);
-  gyro_orientation(0.0196);
-  acc_orientation();
-  //CFilter(0.94,0.06);
+  /*Serial.print(real_gx); Serial.print("  ");
+  Serial.print(real_gy + 1); Serial.print("  ");
+  Serial.println(real_gz);*/
+  //acc_orientation();
+  gyro_orientation(0.0196); //NB serial prints affect sampling time
+  CFilter(0.95, 0.05);
+  
 }
 
 void acc_process(float sensitivity) {
@@ -84,9 +85,9 @@ void acc_process(float sensitivity) {
 
   // map and process raw values to gravity
   //normalization values are affected by fullscale reading
-  ax_p = ax / sensitivity*9.81;
-  ay_p = ay / sensitivity*9.81;
-  az_p = -(az / sensitivity)*9.81;
+  ax_p = ax / sensitivity * 9.81;
+  ay_p = ay / sensitivity * 9.81;
+  az_p = -(az / sensitivity) * 9.81;
   //currently returns G-forces
   /*ax_p = ax / 1573.90;
     ay_p = ay / 1662.18;
@@ -168,7 +169,6 @@ void callibrate_noise(int dataSize , int spd) {
   delay(5000); //debugging delay
 }
 
-
 void accFilter(float accel_min[3], float accel_max[3], int spd) {
   //manual mode of accFilter_auto, rather specify your own min and maximum noise bands
   //filters stationary noise acts as a bandpass filter
@@ -220,35 +220,36 @@ void gyroFilter(float gyro_min[3], float gyro_max[3], int spd) {
   delay(spd); //return rate
 }
 
-
 void acc_orientation() {
-
-  pitch_acc = atan2(ay_p, sqrt(pow(ax_p,2)+pow(az_p,2))) * RAD_TO_DEG; roll_acc = atan2(ax_p, sqrt(pow(ay_p,2)+pow(az_p,2)))* RAD_TO_DEG; yaw_acc = asin(az_p / 9.81) * RAD_TO_DEG;
-  if (isnan(yaw_acc)){
+  pitch_acc = atan2(ay_p, sqrt(pow(ax_p, 2) + pow(az_p, 2))) * RAD_TO_DEG; roll_acc = atan2(ax_p, sqrt(pow(ay_p, 2) + pow(az_p, 2))) * RAD_TO_DEG; yaw_acc = asin(az_p / 9.81) * RAD_TO_DEG;
+  if (isnan(yaw_acc)) {
     yaw_acc = 90;
-    
+  }
   /*Serial.print(pitch_acc); Serial.print(" "); Serial.print(roll_acc); Serial.print(" ");
-  Serial.println(yaw_acc);*/
-}
+    Serial.println(yaw_acc);*/
 }
 
 void gyro_orientation(double sample_rate) {
-  int gyro_offset_x = -1; // x offset
-  int gyro_offset_y = 0;//y
-  pitch_gyro = pitch_gyro + ((real_gx-gyro_offset_x) * sample_rate);
-  roll_gyro = roll_gyro + ((real_gy-gyro_offset_y) * sample_rate);
+  float gyro_offset_x = 0; // x offset
+  float gyro_offset_y = -1;//y
+  pitch_gyro = pitch_gyro + ((real_gx - gyro_offset_x) * sample_rate);
+  roll_gyro = roll_gyro  + ((real_gy - gyro_offset_y) * sample_rate);
   yaw_gyro = yaw_gyro + (real_gz * sample_rate);
-  // Serial.print("                           ");
-  /*Serial.print(-900);  // To freeze the lower limit
+  Serial.print("                           ");
+  Serial.print(-900);  // To freeze the lower limit              // These Serial prints affect sampling time
   Serial.print(" ");
   Serial.print(900);  // To freeze the upper limit
   Serial.print(" ");
   Serial.print(pitch_gyro); Serial.print(" "); Serial.print(roll_gyro); Serial.print(" ");
-  Serial.println(yaw_gyro);*/
+  Serial.println(yaw_gyro);
 }
 
-void CFilter(float gyro_coeff,float accel_coeff){
-  F_pitch = gyro_coeff*pitch_gyro+accel_coeff*pitch_acc;
-  F_roll = gyro_coeff*roll_gyro+accel_coeff*roll_acc;
-  Serial.print(F_pitch);Serial.print(" ");Serial.println(F_roll);
-  }
+void CFilter(float gyro_coeff, float accel_coeff) {
+  F_pitch = (gyro_coeff * pitch_gyro) + (accel_coeff * pitch_acc);
+  F_roll = (gyro_coeff * roll_gyro) + (accel_coeff * roll_acc);
+  Serial.print(-300);  // To freeze the lower limit
+  Serial.print(" ");
+  Serial.print(300);  // To freeze the upper limit
+  Serial.print(" ");
+  Serial.print(F_pitch); Serial.print(" "); Serial.println(F_roll);
+}
