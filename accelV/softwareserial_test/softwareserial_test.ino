@@ -19,6 +19,8 @@ void loop() {
   // put your main code here, to run repeatedly:
 if(BT.available()){
 int data = BT.read();
+
+
 if(data ==49){
   //Serial.println(true);
   throttle +=1 ;
@@ -36,7 +38,7 @@ if(data ==49){
   Serial.print(pwm);Serial.print(" ");
   pwm = map(pwm,0,1500,0,180);
     Serial.println(pwm);
-  ESC1.write(pwm);
+ ESC1.write(pwm);
 ESC2.write(pwm);
 ESC3.write(pwm);
 ESC4.write(pwm);

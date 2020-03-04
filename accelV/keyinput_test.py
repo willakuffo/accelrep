@@ -18,6 +18,8 @@ print('Connecting ...')
 sock=bluetooth.BluetoothSocket( bluetooth.RFCOMM )
 sock.connect((bd_addr, port))
 print('Connection Successful!!!\nConnected to HC-06  on',bd_addr)
+print('ARMING DRONE...')
+sock.send(bytes('2','utf-8'))
 time.sleep(5)
 
 '''reducing number of repeatitions per number which is sent would improve responsiveness'''
